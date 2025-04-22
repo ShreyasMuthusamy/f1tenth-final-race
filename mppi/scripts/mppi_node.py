@@ -9,6 +9,7 @@ from rclpy.node import Node
 import tf_transformations
 from geometry_msgs.msg import Point, PoseStamped
 from nav_msgs.msg import Odometry
+from sensor_msgs.msg import LaserScan
 from ackermann_msgs.msg import AckermannDriveStamped
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
 from utils.ros_np_multiarray import to_multiarray_f32, to_numpy_f32
@@ -62,7 +63,7 @@ class MPPI_Node(Node):
         self.mppi.update(jnp.asarray(state_c_0), jnp.asarray(reference_traj))
         self.get_logger().info('MPPI initialized')
         
-        breakpoint()
+        # breakpoint()
         qos = rclpy.qos.QoSProfile(history=rclpy.qos.QoSHistoryPolicy.KEEP_LAST,
                                    depth=1,
                                    reliability=rclpy.qos.QoSReliabilityPolicy.RELIABLE,
@@ -72,19 +73,30 @@ class MPPI_Node(Node):
             self.pose_sub = self.create_subscription(Odometry, "/ego_racecar/odom", self.pose_callback, qos)
         else:
             self.pose_sub = self.create_subscription(Odometry, "/pf/pose/odom", self.pose_callback, qos)
+        self.scan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, qos)
         # publishers
         self.drive_pub = self.create_publisher(AckermannDriveStamped, "/drive", qos)
         self.reference_pub = self.create_publisher(Float32MultiArray, "/reference_arr", qos)
         self.opt_traj_pub = self.create_publisher(Float32MultiArray, "/opt_traj_arr", qos)
+    
+    def scan_callback(self, scan_msg: LaserScan):
+        """
+        Callback function for subscribing to the LiDAR scan.
+        This function process the scan from the LiDAR.
 
-    def pose_callback(self, pose_msg):
+        Args: 
+            scan_msg (LaserScan): incoming message from subscribed topic
+        """
+        pass
+
+    def pose_callback(self, pose_msg: Odometry):
         """
         Callback function for subscribing to particle filter's inferred pose.
         This funcion saves the current pose of the car and obtain the goal
         waypoint from the pure pursuit module.
 
         Args: 
-            pose_msg (PoseStamped): incoming message from subscribed topic
+            pose_msg (Odometry): incoming message from subscribed topic
         """
         pose = pose_msg.pose.pose
         twist = pose_msg.twist.twist

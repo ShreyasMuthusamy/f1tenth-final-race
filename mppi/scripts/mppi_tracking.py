@@ -97,7 +97,8 @@ class MPPI():
         
         R = jax.vmap(self.returns)(reward) # [n_samples, n_steps], pylint: disable=invalid-name
         w = jax.vmap(self.weights, 1, 1)(R)  # [n_samples, n_steps]
-        da_opt = jax.vmap(jnp.average, (1, None, 1))(da, 0, w)  # [n_steps, dim_a]
+        # da_opt = jax.vmap(jnp.average, (1, None, 1))(da, 0, w)  # [n_steps, dim_a]
+        da_opt = da[jnp.argmax(jnp.sum(R, axis=1), axis=0)]
         a_opt = jnp.clip(a_opt + da_opt, -1.0, 1.0)  # [n_steps, dim_a]
         if self.adaptive_covariance:
             a_cov = jax.vmap(jax.vmap(jnp.outer))(
