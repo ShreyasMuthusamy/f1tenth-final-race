@@ -115,7 +115,7 @@ class InferEnv():
         norm_curv = (curvature - curv_min) / (curv_max - curv_min + 1e-6)
         curvature_weight = 1.0 + 2.0 * norm_curv  # 1 (straight) to 3 (sharp turn)
 
-        xy_cost = -jnp.linalg.norm(reference[1:, :2] - state[:, :2], ord=1, axis=1)
+        xy_cost = -jnp.linalg.norm(reference[1:, :2] - state[:, :2], ord=2, axis=1)
         vel_cost = -jnp.linalg.norm(reference[1:, 2] - state[:, 3])
         yaw_cost = -jnp.abs(jnp.sin(reference[1:, 3]) - jnp.sin(state[:, 4])) \
                 - jnp.abs(jnp.cos(reference[1:, 4]) - jnp.cos(state[:, 4]))
@@ -123,6 +123,7 @@ class InferEnv():
         weighted_xy_cost = curvature_weight**2 * xy_cost # heavily penalize the errors at the high curvature position
 
         return 1000 * weighted_xy_cost + 5 * vel_cost + 25 * yaw_cost
+        # return weighted_xy_cost
     
     
     def calc_ref_trajectory_kinematic(self, state, cx, cy, cyaw, sp):
@@ -185,10 +186,10 @@ class InferEnv():
         else:
             speed = target_speed
         
-        # if ind < self.waypoints.shape[0] - self.n_steps:
-        #     speeds = self.waypoints[ind:ind+self.n_steps, vind]
-        # else:
-        speeds = np.ones(n_steps) * speed
+        if ind < self.waypoints.shape[0] - n_steps:
+            speeds = self.waypoints[ind:ind+n_steps, vind]
+        else:
+            speeds = np.ones(n_steps) * speed
         
         reference = get_reference_trajectory(speeds, dist, ind, 
                                             self.waypoints.copy(), int(n_steps),

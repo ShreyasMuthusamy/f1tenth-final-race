@@ -9,7 +9,7 @@ control_sample_std:
 - 0.5
 exp_name: mppi_tracking
 friction: 0.8
-init_vel: 2.0
+init_vel: 3.0
 is_sim: true
 map_dir: ./waypoints/
 map_ind: 0
@@ -22,14 +22,14 @@ norm_params:
 - - 6.0
   - -3.0
 random_seed: 527787
-ref_vel: 4.0
+ref_vel: 3.5
 pp_vel: 5.0
 render: 1
 s_frame_max: 62.12059091197948
 sim_time_step: 0.1
 state_predictor: dynamic_ST
 wpt_delim: ;
-wpt_path: levine/levine.csv
+wpt_path: race3/race3_mod_wp.csv
 # wpt_path: slam_levine/slam_levine.csv
 wpt_rowskip: 3
 wpt_thind: 3

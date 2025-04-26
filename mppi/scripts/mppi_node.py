@@ -163,7 +163,8 @@ class MPPI_Node(Node):
         pp_closest_point_idx = self.pure_pursuit.find_closetpoint(pp_trajectory, pp_vehicle_pose)
         # ref_speed = pp_trajectory[pp_closest_point_idx, -1] # NOTE: enable this for speed profiling
 
-        if time.time() - self.start_time <= self.depart_time:
+        # if time.time() - self.start_time <= self.depart_time:
+        if False:
             pp_lookahead = self.pure_pursuit.look_ahead       # fox fix loodahead
     
             pp_target_pose = self.pure_pursuit.find_waypoint(pp_trajectory, pp_vehicle_pose, pp_lookahead)
@@ -195,11 +196,11 @@ class MPPI_Node(Node):
             drive_msg.header.stamp = self.get_clock().now().to_msg()
             drive_msg.header.frame_id = "base_link"
             drive_msg.drive.steering_angle = self.control[0]
-            # drive_msg.drive.speed = self.control[1] ###### NOTE: this follow the reference speed in config file
+            drive_msg.drive.speed = self.control[1] ###### NOTE: this follow the reference speed in config file
             # drive_msg.drive.speed = ref_speed               # NOTE: enable this for speed profiling
             # drive_msg.drive.speed = 6.0 if abs(self.control[0]) <= np.radians(10) else 5.0         
             curvature = calc_xy_curvature_stats(reference_traj, mode='mean')
-            drive_msg.drive.speed = max(6.0, 7.0 * np.exp(-curvature * 1.5)) 
+            # drive_msg.drive.speed = 2.2
             # drive_msg.drive.speed = max(4.0, 4.0 + 3.0 / (1.0 + curvature * 0.5)) 
 
             print(f'Curvature: {curvature}, Speed: {drive_msg.drive.speed}')

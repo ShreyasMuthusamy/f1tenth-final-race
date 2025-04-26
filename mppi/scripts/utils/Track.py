@@ -83,8 +83,8 @@ class Track:
         self.len_s = len(self.centerline.s)
         self.raceline = raceline or CubicSplineND(xs, ys, psis, kappas, velxs, accxs, ss)
         self.s_guess = 0.0
-        self.tr_rights_jax = jnp.array(tr_rights)
-        self.tr_lefts_jax = jnp.array(tr_lefts)
+        self.tr_rights_jax = jnp.array(self.tr_rights)
+        self.tr_lefts_jax = jnp.array(self.tr_lefts)
 
     @staticmethod
     def from_numpy(waypoints: np.ndarray, s_frame_max, downsample_step = 1) -> Track:
