@@ -96,20 +96,34 @@ class PurePursuit(Node):
     def obs_callback(self, obs_msg: Float32MultiArray):
         obstacles = to_numpy(obs_msg)
         clearance = self.config['controller']['clearance']
+        opt_traj = self.trajectories[0]
+
+        # if not np.array_equal(opt_traj, self.trajectory):
+        #     dist = np.linalg.norm(opt_traj[None, :, :2] - obstacles[:, None], axis=-1)
+        #     min_dists_opt = np.min(dist, axis=0)
+
+        #     if np.all(min_dists_opt > clearance):
+        #         # print('Lane switch! (to optimal)')
+        #         self.trajectory = opt_traj
+        #         return
 
         dist = np.linalg.norm(self.trajectory[None, :, :2] - obstacles[:, None], axis=-1)
-        min_dists = np.min(dist, axis=0)
-
-        if np.all(min_dists > clearance):
+        min_dists_curr = np.min(dist, axis=0)
+        if np.all(min_dists_curr > clearance):
+            # print('Lane switch! (to current)')
             return
 
         for traj in self.trajectories:
+            if np.array_equal(traj, opt_traj) or np.array_equal(traj, self.trajectory):
+                continue
+
             dist = np.linalg.norm(traj[None, :, :2] - obstacles[:, None], axis=-1)
             min_dists = np.min(dist, axis=0)
 
-            if np.all(min_dists > clearance) and not np.array_equal(traj, self.trajectory):
+            if np.all(min_dists > clearance):
+                print('Lane switch!')
                 self.trajectory = traj
-                break
+                return
         
         print('Too fat!')
 

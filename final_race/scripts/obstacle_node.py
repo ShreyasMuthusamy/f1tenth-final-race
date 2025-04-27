@@ -72,9 +72,18 @@ class ObstacleDetection(Node):
 
         obs = self.detect_obstacles(points)
 
-        if len(obs):
-            obs_msg = to_multiarray(obs + self.vehicle_pose[:2])
+        if len(obs) and self.vehicle_pose is not None:
+            x_c, y_c, yaw, _ = self.vehicle_pose
+            R = np.array([[np.cos(yaw), -np.sin(yaw)],
+                        [np.sin(yaw), np.cos(yaw)]])
+            
+            obs = np.einsum('ij,...j->...i', R, obs) + np.array([x_c, y_c])
+            obs_msg = to_multiarray(obs)
             self.obs_pub.publish(obs_msg)
+
+        # if self.vehicle_pose is not None:
+        #     points_msg = to_multiarray(points)
+        #     self.obs_pub.publish(points_msg)
 
     def locate_vehicle(self, msg: Odometry):
         """Extract vehicle pose from the Odometry message.
