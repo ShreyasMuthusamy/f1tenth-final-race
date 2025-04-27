@@ -1,0 +1,12 @@
+controller:
+  clearance: 0.05
+  trajectories:
+    wp1_name: centerline_deviate.csv
+    wp2_name: centerline_deviate_inner.csv
+    wp3_name: centerline_deviate_outer.csv
+obstacle_detection:
+  cone_radius: 200
+  preprocess_conv_size: 5
+  lookahead: 4.0
+  distance_threshold: 1.5
+is_sim: true
