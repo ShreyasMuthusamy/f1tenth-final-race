@@ -37,6 +37,7 @@ install(PROGRAMS
   scripts/waypoint_visualizer.py
   scripts/waypoint_visualizer_2.py
   scripts/controller_node.py
+  scripts/reactive_node.py
   scripts/obstacle_node.py
   scripts/lane_switching_node.py
   DESTINATION lib/${PROJECT_NAME}

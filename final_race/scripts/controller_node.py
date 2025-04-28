@@ -14,7 +14,7 @@ import pandas as pd
 import yaml
 import os
 
-base_dir = '/home/shreyasm/f1tenth_ws/src/final_race/'
+base_dir = '/root/race3/mppi_race3/final_race/'
 config_path = os.path.join(base_dir, 'config/race_params.yaml')
 config_path = os.path.abspath(config_path)
 
@@ -41,7 +41,7 @@ class PurePursuit(Node):
         else:
             odom_topic = '/pf/pose/odom'
         drive_topic = '/drive'
-        traj_topic = '/trajectory'
+        reactive_topic = '/reactive'
 
         qos = rclpy.qos.QoSProfile(history=rclpy.qos.QoSHistoryPolicy.KEEP_LAST,
                                    depth=1,
@@ -49,7 +49,7 @@ class PurePursuit(Node):
                                    durability=rclpy.qos.QoSDurabilityPolicy.VOLATILE)
 
         self.odom_subscriber = self.create_subscription(Odometry, odom_topic, self.pose_callback, qos)
-        self.traj_subscriber = self.create_subscription(Float32MultiArray, traj_topic, self.traj_callback, qos)
+        self.reactive_subcriber = self.create_subscription(Float32MultiArray, reactive_topic, self.reactive_callback, qos)
         self.publisher = self.create_publisher(AckermannDriveStamped, drive_topic, qos)
         self.find_localwp = False
 
@@ -65,6 +65,9 @@ class PurePursuit(Node):
 
         self.look_ahead = 0.7 ## NOTE: increase this to reduce responsiveness, less wobbling, old: 2.0
         print(f"Trajectory avg speed {np.mean(pd.read_csv(wp_path, sep=';')['speed'])}")
+
+
+        self.reactive_message = np.array([0., 0., 0.])
 
     def pose_callback(self, pose_msg: Odometry):
         trajectory = self.trajectory[::5, :] ## NOTE: Downsample to reduce responsiveness 
@@ -88,45 +91,19 @@ class PurePursuit(Node):
         ############################
         speed = trajectory[closest_point_idx, -2] * 1.25
 
+        if self.reactive_message[0]==1.0:
+            self.get_logger().info("try to advoid obs")
+
+            speed = self.reactive_message[1]
+            steering_angle = self.reactive_message[2]
+
+
         self.visualize([trajectory[closest_point_idx, :2]], color=(0.0, 1.0, 0.0), duration=1, target=False)
         self.publish_driving_msg(speed, steering_angle)
     
-    def traj_callback(self, traj_msg: Float32MultiArray):
-        self.trajectory = to_numpy(traj_msg)
+    def reactive_callback(self, reactive_msg: Float32MultiArray):
+        self.reactive_message = to_numpy(reactive_msg)
 
-    # def obs_callback(self, obs_msg: Float32MultiArray):
-    #     obstacles = to_numpy(obs_msg)
-    #     clearance = self.config['controller']['clearance']
-    #     opt_traj = self.trajectories[0]
-
-    #     # if not np.array_equal(opt_traj, self.trajectory):
-    #     #     dist = np.linalg.norm(opt_traj[None, :, :2] - obstacles[:, None], axis=-1)
-    #     #     min_dists_opt = np.min(dist, axis=0)
-
-    #     #     if np.all(min_dists_opt > clearance):
-    #     #         # print('Lane switch! (to optimal)')
-    #     #         self.trajectory = opt_traj
-    #     #         return
-
-    #     dist = np.linalg.norm(self.trajectory[None, :, :2] - obstacles[:, None], axis=-1)
-    #     min_dists_curr = np.min(dist, axis=0)
-    #     if np.all(min_dists_curr > clearance):
-    #         # print('Lane switch! (to current)')
-    #         return
-
-    #     for traj in self.trajectories:
-    #         if np.array_equal(traj, opt_traj) or np.array_equal(traj, self.trajectory):
-    #             continue
-
-    #         dist = np.linalg.norm(traj[None, :, :2] - obstacles[:, None], axis=-1)
-    #         min_dists = np.min(dist, axis=0)
-
-    #         if np.all(min_dists > clearance):
-    #             print('Lane switch!')
-    #             self.trajectory = traj
-    #             return
-        
-    #     print('Too fat!')
 
     def locate_vehicle(self, msg: Odometry):
         """Extract vehicle pose from the Odometry message.
