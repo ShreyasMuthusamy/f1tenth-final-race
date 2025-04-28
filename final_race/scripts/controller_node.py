@@ -92,11 +92,12 @@ class PurePursuit(Node):
         speed = trajectory[closest_point_idx, -2] * 1.25
 
         if self.reactive_message[0]==1.0:
-            self.get_logger().info("try to advoid obs")
+            self.get_logger().info("Reactive mode on")
 
             speed = self.reactive_message[1]
             steering_angle = self.reactive_message[2]
-
+        else:
+            self.get_logger().info("PP mode on")
 
         self.visualize([trajectory[closest_point_idx, :2]], color=(0.0, 1.0, 0.0), duration=1, target=False)
         self.publish_driving_msg(speed, steering_angle)

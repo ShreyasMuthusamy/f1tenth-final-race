@@ -6,6 +6,17 @@ from sensor_msgs.msg import LaserScan
 from ackermann_msgs.msg import AckermannDriveStamped, AckermannDrive
 import yaml
 from std_msgs.msg import MultiArrayDimension, Float32MultiArray
+import os
+
+base_dir = '/root/race3/mppi_race3/final_race/'
+config_path = os.path.join(base_dir, 'config/race_params.yaml')
+config_path = os.path.abspath(config_path)
+
+
+def load_parameters(file_path):
+    with open(file_path, "r") as file:
+        params = yaml.safe_load(file)
+    return params
 
 def to_multiarray(np_array: np.ndarray):
     multiarray = Float32MultiArray()
@@ -29,12 +40,13 @@ class ReactiveFollowGap(Node):
 
         super().__init__('reactive_node')
 
+        self.config = load_parameters(config_path)
         lidarscan_topic = '/scan'
         reactive_topic = '/reactive'
 
         self.subscriber = self.create_subscription(LaserScan, lidarscan_topic, self.lidar_callback, 10)
         self.publisher = self.create_publisher(Float32MultiArray, reactive_topic, 10)
-        self.radians_per_elem = None
+        self.radians_per_elem = None  
 
         self.get_logger().info("Naive GapFollow Activated!!!")
 
@@ -154,6 +166,16 @@ class ReactiveFollowGap(Node):
             speed = self.STRAIGHTS_SPEED
 
 
+        # detect obs
+        ranges, angles = self.preprocess_lidar_for_obs(data)
+
+        xs = ranges * np.cos(angles)
+        ys = ranges * np.sin(angles)
+        points = np.vstack([xs, ys]).T
+
+        obs = self.detect_obstacles(points)
+
+
         ################ Config for detect obs #########################################################################################################
         # Check for obstacles in a small cone in front of the car
         cone_angle = np.radians(20)  # Define the cone angle in radians
@@ -166,10 +188,14 @@ class ReactiveFollowGap(Node):
         cone_end = min(center_index + cone_width, len(proc_ranges) - 1)
 
         # Check if any range in the cone is below the threshold
-        if np.any(proc_ranges[cone_start:cone_end] < cone_threshold):
-            self.get_logger().info("Obstacle detected in front cone! Slowing down.")
-            speed = 3.0  # Slow down if an obstacle is detected
-            reactive_message = np.array([1.0, speed, steering_angle]) # 1.0  means in the reactive_mode
+
+        if obs.size > 0:
+            if np.any(proc_ranges[cone_start:cone_end] < cone_threshold) :
+                self.get_logger().info("Obstacle detected in front cone! Slowing down.")
+                speed = 3.0  # Slow down if an obstacle is detected
+                reactive_message = np.array([1.0, speed, steering_angle]) # 1.0  means in the reactive_mode
+            else:
+                reactive_message = np.array([0.0, 0.0, 0.0])    
         else:
             reactive_message = np.array([0.0, 0.0, 0.0])
 
@@ -182,7 +208,70 @@ class ReactiveFollowGap(Node):
         # drive_msg.drive.speed = speed
 
         # self.publisher.publish(drive_msg)
+    
+    def detect_obstacles(self, points: np.ndarray) -> np.ndarray:
+        """
+        Get the locations of the disparities from the point information
+        
+        Args:
+            points (np.ndarray): Point data.
+        
+        Returns:
+            out (np.ndarray): Points at which there are obstacles.
+        """
+        # lookahead = self.config['obstacle_detection']['lookahead']
+        # distance_threshold = self.config['obstacle_detection']['distance_threshold']
+        lookahead = 1.5
+        distance_threshold = 0.5
 
+        mask = np.linalg.norm(points, ord=2, axis=1) < lookahead
+        obs_idxs = []
+        idx_start = -1
+        idx_end = -1
+        for i in range(1, len(mask)):
+            if mask[i] and not mask[i-1]:
+                idx_start = i
+            if not mask[i] and mask[i-1]:
+                idx_end = i
+                if np.linalg.norm(points[idx_end] - points[idx_start], ord=2) < distance_threshold:
+                    obs_idxs.append(np.arange(idx_start, idx_end))
+
+        return points[np.concatenate(obs_idxs)] if len(obs_idxs) else np.array([])
+    
+    def preprocess_lidar_for_obs(self, scan_msg: LaserScan) -> np.ndarray:
+        """
+        Preprocess the LiDAR scan array with the following pipeline:
+            1. Clipping the ranges viewed
+            2. Setting each value to the mean over some window
+            3. Rejecting high values above 3 m
+        
+        Args:
+            ranges (np.ndarray): Ranges to be preprocessed.
+        
+        Returns:
+            out (np.ndarray): Ranges after preprocessing.
+        """
+
+        cone_radius = 200
+        ranges = scan_msg.ranges
+        angles = np.arange(scan_msg.angle_min, scan_msg.angle_max, scan_msg.angle_increment)
+        if len(ranges) != len(angles):
+            angles = np.linspace(scan_msg.angle_min, scan_msg.angle_max, len(ranges))
+
+        # we won't use the LiDAR data from directly behind us
+        # trying to take the forward cone values
+        proc_ranges = np.array(ranges[len(ranges)//2-cone_radius:len(ranges)//2+cone_radius])
+        angles = angles[len(ranges)//2-cone_radius:len(ranges)//2+cone_radius]
+
+        # Moving average filter - sensor noise is filtered, smoothing filter here
+        conv_size = self.config['obstacle_detection']['preprocess_conv_size']
+        proc_ranges = np.convolve(proc_ranges, np.ones(conv_size), 'same') / conv_size
+
+        # this helps with nans and inf values
+        proc_ranges = np.clip(proc_ranges, 0.0, 5.0)
+
+        return proc_ranges, angles
+    
 
 
 def main(args=None):
