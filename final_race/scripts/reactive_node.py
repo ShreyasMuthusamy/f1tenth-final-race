@@ -177,6 +177,25 @@ class ReactiveFollowGap(Node):
             speed = self.STRAIGHTS_SPEED
 
 
+        # # Check lidar range from the left and right
+        # left_angle_start = int((70 * np.pi / 180) / self.radians_per_elem)
+        # left_angle_end = int((85 * np.pi / 180) / self.radians_per_elem)
+        # right_angle_start = int((-85 * np.pi / 180) / self.radians_per_elem)
+        # right_angle_end = int((-70 * np.pi / 180) / self.radians_per_elem)
+
+        # left_range = np.mean(proc_ranges[len(proc_ranges)//2 + left_angle_start:len(proc_ranges)//2 + left_angle_end])
+        # right_range = np.mean(proc_ranges[len(proc_ranges)//2 + right_angle_start:len(proc_ranges)//2 + right_angle_end])
+
+        # # Limit steering angle if range is too small
+        # side_threshold = 0.5  # Threshold distance to the side
+        # if left_range < side_threshold and steering_angle > 0:
+        #     self.get_logger().info("Left side too close! Limiting steering angle.")
+        #     steering_angle = min(steering_angle, np.radians(-10))
+        # if right_range < side_threshold and steering_angle < 0:
+        #     self.get_logger().info("Right side too close! Limiting steering angle.")
+        #     steering_angle = max(steering_angle, np.radians(10))
+
+
         # # detect obs
         # ranges, angles = self.preprocess_lidar_for_obs(data)
 

@@ -97,7 +97,7 @@ class PurePursuit(Node):
         speed = trajectory[closest_point_idx, 2] * 0.75
 
         # if self.reactive_message[0]==1.0 and trajectory[closest_point_idx, 4] == 1.0:
-        if trajectory[closest_point_idx, 4] == 1.0:
+        if trajectory[closest_point_idx, 4] == 1.0 and not (-18.0 <= vehicle_pose[0] <= -13 and -3.5 <= vehicle_pose[1] <= 3.5):
             self.get_logger().info("Reactive mode on")
 
             _ = self.reactive_message[1]
@@ -110,7 +110,14 @@ class PurePursuit(Node):
         mask_msg = Int32()
         mask_msg.data = int(trajectory[closest_point_idx, 5])
         self.mask_publisher.publish(mask_msg)
-        
+
+        if vehicle_pose[1] >= 7.5:
+            steering_angle = max(steering_angle, np.radians(5))
+        elif vehicle_pose[1] <= -3.5:
+            steering_angle = max(steering_angle, np.radians(5))
+
+        print(f'yaw {vehicle_pose[2]}')
+        # self.publish_driving_msg(0.0, steering_angle)
         self.publish_driving_msg(speed, steering_angle)
     
     def reactive_callback(self, reactive_msg: Float32MultiArray):
