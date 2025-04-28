@@ -7,6 +7,7 @@ from ackermann_msgs.msg import AckermannDriveStamped, AckermannDrive
 import yaml
 from std_msgs.msg import MultiArrayDimension, Float32MultiArray
 import os
+from std_msgs.msg import Int32
 
 base_dir = '/root/race3/mppi_race3/final_race/'
 config_path = os.path.join(base_dir, 'config/race_params.yaml')
@@ -46,10 +47,16 @@ class ReactiveFollowGap(Node):
 
         self.subscriber = self.create_subscription(LaserScan, lidarscan_topic, self.lidar_callback, 10)
         self.publisher = self.create_publisher(Float32MultiArray, reactive_topic, 10)
-        self.radians_per_elem = None  
+        self.mask_subscriber = self.create_subscription(Int32, '/mask', self.mask_callback, 10)
+        self.radians_per_elem = None
 
         self.get_logger().info("Naive GapFollow Activated!!!")
 
+        self.mask = 0.0
+
+
+    def mask_callback(self, msg):
+        self.mask = msg.data
 
     def preprocess_lidar(self, ranges, data):
         """ Preprocess the LiDAR scan array. Expert implementation includes:
@@ -70,6 +77,10 @@ class ReactiveFollowGap(Node):
 
         # this helps with nans and inf values
         proc_ranges = np.clip(proc_ranges, 0, self.MAX_LIDAR_DIST)
+
+        if self.mask == 1:
+            self.get_logger().info("Mask active!!")
+            proc_ranges[:len(proc_ranges) // 2] = 0
 
         return proc_ranges
     
@@ -166,39 +177,41 @@ class ReactiveFollowGap(Node):
             speed = self.STRAIGHTS_SPEED
 
 
-        # detect obs
-        ranges, angles = self.preprocess_lidar_for_obs(data)
+        # # detect obs
+        # ranges, angles = self.preprocess_lidar_for_obs(data)
 
-        xs = ranges * np.cos(angles)
-        ys = ranges * np.sin(angles)
-        points = np.vstack([xs, ys]).T
+        # xs = ranges * np.cos(angles)
+        # ys = ranges * np.sin(angles)
+        # points = np.vstack([xs, ys]).T
 
-        obs = self.detect_obstacles(points)
+        # obs = self.detect_obstacles(points)
 
 
-        ################ Config for detect obs #########################################################################################################
-        # Check for obstacles in a small cone in front of the car
-        cone_angle = np.radians(20)  # Define the cone angle in radians
-        cone_threshold = 3.0  # Define the threshold distance
+        # ################ Config for detect obs #########################################################################################################
+        # # Check for obstacles in a small cone in front of the car
+        # cone_angle = np.radians(30)  # Define the cone angle in radians
+        # cone_threshold = 3.0  # Define the threshold distance
 
-        # Calculate the indices for the cone
-        center_index = len(proc_ranges) // 2
-        cone_width = int(cone_angle / self.radians_per_elem)
-        cone_start = max(center_index - cone_width, 0)
-        cone_end = min(center_index + cone_width, len(proc_ranges) - 1)
+        # # Calculate the indices for the cone
+        # center_index = len(proc_ranges) // 2
+        # cone_width = int(cone_angle / self.radians_per_elem)
+        # cone_start = max(center_index - cone_width, 0)
+        # cone_end = min(center_index + cone_width, len(proc_ranges) - 1)
 
-        # Check if any range in the cone is below the threshold
+        # # Check if any range in the cone is below the threshold
 
-        if obs.size > 0:
-            if np.any(proc_ranges[cone_start:cone_end] < cone_threshold) :
-                self.get_logger().info("Obstacle detected in front cone! Slowing down.")
-                speed = 3.0  # Slow down if an obstacle is detected
-                reactive_message = np.array([1.0, speed, steering_angle]) # 1.0  means in the reactive_mode
-            else:
-                reactive_message = np.array([0.0, 0.0, 0.0])    
-        else:
-            reactive_message = np.array([0.0, 0.0, 0.0])
+        # if obs.size > 0:
+        #     if np.any(proc_ranges[cone_start:cone_end] < cone_threshold) :
+        #         self.get_logger().info("Obstacle detected in front cone! Slowing down.")
+        #         speed = 3.0  # Slow down if an obstacle is detected
+        #         reactive_message = np.array([1.0, speed, steering_angle]) # 1.0  means in the reactive_mode
+        #     else:
+        #         reactive_message = np.array([0.0, speed, steering_angle])    
+        # else:
+        #     reactive_message = np.array([0.0, speed, steering_angle])
 
+    
+        reactive_message = np.array([0.0, speed, steering_angle])
         reactive_message = to_multiarray(reactive_message)
         self.publisher.publish(reactive_message)
 

@@ -1,6 +1,7 @@
 controller:
   trajectories:
-    default: centerline_deviate.csv
+    default: centerline_with_mode.csv
+    wp1_name: centerline_deviate.csv
     wp2_name: centerline_deviate_inner.csv
     wp3_name: centerline_deviate_outer.csv
 obstacle_detection:

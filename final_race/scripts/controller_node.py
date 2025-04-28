@@ -13,6 +13,7 @@ from builtin_interfaces.msg import Duration
 import pandas as pd
 import yaml
 import os
+from std_msgs.msg import Int32
 
 base_dir = '/root/race3/mppi_race3/final_race/'
 config_path = os.path.join(base_dir, 'config/race_params.yaml')
@@ -51,6 +52,8 @@ class PurePursuit(Node):
         self.odom_subscriber = self.create_subscription(Odometry, odom_topic, self.pose_callback, qos)
         self.reactive_subcriber = self.create_subscription(Float32MultiArray, reactive_topic, self.reactive_callback, qos)
         self.publisher = self.create_publisher(AckermannDriveStamped, drive_topic, qos)
+
+        self.mask_publisher = self.create_publisher(Int32, '/mask', qos)
         self.find_localwp = False
 
         # visualize trajectory and target waypoint
@@ -62,9 +65,11 @@ class PurePursuit(Node):
         wp_path = os.path.join(base_dir, f'waypoints/{wp_name}')
         wp_path = os.path.abspath(wp_path)
         self.trajectory = np.array(pd.read_csv(wp_path, sep=';'))
+        # self.trajectory = np.array(pd.read_csv(wp_path))
 
         self.look_ahead = 0.7 ## NOTE: increase this to reduce responsiveness, less wobbling, old: 2.0
         print(f"Trajectory avg speed {np.mean(pd.read_csv(wp_path, sep=';')['speed'])}")
+        # print(f"Trajectory avg speed {np.mean(pd.read_csv(wp_path)['speed'])}")
 
 
         self.reactive_message = np.array([0., 0., 0.])
@@ -75,7 +80,7 @@ class PurePursuit(Node):
         # Find the current waypoint to track using methods mentioned in lecture
         vehicle_pose = self.locate_vehicle(pose_msg)
         closest_point_idx = self.find_closetpoint(trajectory, vehicle_pose)
-        lookahead = trajectory[closest_point_idx, -1] * 2
+        lookahead = trajectory[closest_point_idx, 3] * 1.0
  
         target_pose = self.find_waypoint(trajectory, vehicle_pose, lookahead)
         self.visualize([target_pose[:2]], color=(1.0, 0.0, 0.0), duration=1)
@@ -89,17 +94,23 @@ class PurePursuit(Node):
         speed, steering_angle = self.calculate_driving_msg(curvature)
 
         ############################
-        speed = trajectory[closest_point_idx, -2] * 1.25
+        speed = trajectory[closest_point_idx, 2] * 0.75
 
-        if self.reactive_message[0]==1.0:
+        # if self.reactive_message[0]==1.0 and trajectory[closest_point_idx, 4] == 1.0:
+        if trajectory[closest_point_idx, 4] == 1.0:
             self.get_logger().info("Reactive mode on")
 
-            speed = self.reactive_message[1]
+            _ = self.reactive_message[1]
             steering_angle = self.reactive_message[2]
         else:
             self.get_logger().info("PP mode on")
 
         self.visualize([trajectory[closest_point_idx, :2]], color=(0.0, 1.0, 0.0), duration=1, target=False)
+        
+        mask_msg = Int32()
+        mask_msg.data = int(trajectory[closest_point_idx, 5])
+        self.mask_publisher.publish(mask_msg)
+        
         self.publish_driving_msg(speed, steering_angle)
     
     def reactive_callback(self, reactive_msg: Float32MultiArray):
