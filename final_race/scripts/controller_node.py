@@ -25,7 +25,7 @@ def load_parameters(file_path):
 
 def to_numpy(multiarray):
     dims = tuple(map(lambda x: x.size, multiarray.layout.dim))
-    return np.array(multiarray.data, dtype=float).reshape(dims).astype(np.float32)
+    return np.array(multiarray.data, dtype=float).reshape(dims).astype(float)
 
 class PurePursuit(Node):
     """ 
@@ -41,7 +41,7 @@ class PurePursuit(Node):
         else:
             odom_topic = '/pf/pose/odom'
         drive_topic = '/drive'
-        obs_topic = '/obstacles'
+        traj_topic = '/trajectory'
 
         qos = rclpy.qos.QoSProfile(history=rclpy.qos.QoSHistoryPolicy.KEEP_LAST,
                                    depth=1,
@@ -49,7 +49,7 @@ class PurePursuit(Node):
                                    durability=rclpy.qos.QoSDurabilityPolicy.VOLATILE)
 
         self.odom_subscriber = self.create_subscription(Odometry, odom_topic, self.pose_callback, qos)
-        self.obs_subscriber = self.create_subscription(Float32MultiArray, obs_topic, self.obs_callback, qos)
+        self.traj_subscriber = self.create_subscription(Float32MultiArray, traj_topic, self.traj_callback, qos)
         self.publisher = self.create_publisher(AckermannDriveStamped, drive_topic, qos)
         self.find_localwp = False
 
@@ -58,12 +58,10 @@ class PurePursuit(Node):
         self.speed_visualizer = self.create_publisher(Marker, '/pp_viz/speed', qos)
 
         # load trajectory
-        self.trajectories = []
-        for wp_name in self.config['controller']['trajectories'].values():
-            wp_path = os.path.join(base_dir, f'waypoints/{wp_name}')
-            wp_path = os.path.abspath(wp_path)
-            self.trajectories.append(np.array(pd.read_csv(wp_path, sep=';')))
-        self.trajectory = self.trajectories[0]
+        wp_name = self.config['controller']['trajectories']['default']
+        wp_path = os.path.join(base_dir, f'waypoints/{wp_name}')
+        wp_path = os.path.abspath(wp_path)
+        self.trajectory = np.array(pd.read_csv(wp_path, sep=';'))
 
         self.look_ahead = 0.7 ## NOTE: increase this to reduce responsiveness, less wobbling, old: 2.0
         print(f"Trajectory avg speed {np.mean(pd.read_csv(wp_path, sep=';')['speed'])}")
@@ -74,7 +72,7 @@ class PurePursuit(Node):
         # Find the current waypoint to track using methods mentioned in lecture
         vehicle_pose = self.locate_vehicle(pose_msg)
         closest_point_idx = self.find_closetpoint(trajectory, vehicle_pose)
-        lookahead = trajectory[closest_point_idx, -1] * 1.5
+        lookahead = trajectory[closest_point_idx, -1] * 2
  
         target_pose = self.find_waypoint(trajectory, vehicle_pose, lookahead)
         self.visualize([target_pose[:2]], color=(1.0, 0.0, 0.0), duration=1)
@@ -88,44 +86,47 @@ class PurePursuit(Node):
         speed, steering_angle = self.calculate_driving_msg(curvature)
 
         ############################
-        speed = trajectory[closest_point_idx, -2] * 0.75
+        speed = trajectory[closest_point_idx, -2] * 1.25
 
         self.visualize([trajectory[closest_point_idx, :2]], color=(0.0, 1.0, 0.0), duration=1, target=False)
         self.publish_driving_msg(speed, steering_angle)
+    
+    def traj_callback(self, traj_msg: Float32MultiArray):
+        self.trajectory = to_numpy(traj_msg)
 
-    def obs_callback(self, obs_msg: Float32MultiArray):
-        obstacles = to_numpy(obs_msg)
-        clearance = self.config['controller']['clearance']
-        opt_traj = self.trajectories[0]
+    # def obs_callback(self, obs_msg: Float32MultiArray):
+    #     obstacles = to_numpy(obs_msg)
+    #     clearance = self.config['controller']['clearance']
+    #     opt_traj = self.trajectories[0]
 
-        # if not np.array_equal(opt_traj, self.trajectory):
-        #     dist = np.linalg.norm(opt_traj[None, :, :2] - obstacles[:, None], axis=-1)
-        #     min_dists_opt = np.min(dist, axis=0)
+    #     # if not np.array_equal(opt_traj, self.trajectory):
+    #     #     dist = np.linalg.norm(opt_traj[None, :, :2] - obstacles[:, None], axis=-1)
+    #     #     min_dists_opt = np.min(dist, axis=0)
 
-        #     if np.all(min_dists_opt > clearance):
-        #         # print('Lane switch! (to optimal)')
-        #         self.trajectory = opt_traj
-        #         return
+    #     #     if np.all(min_dists_opt > clearance):
+    #     #         # print('Lane switch! (to optimal)')
+    #     #         self.trajectory = opt_traj
+    #     #         return
 
-        dist = np.linalg.norm(self.trajectory[None, :, :2] - obstacles[:, None], axis=-1)
-        min_dists_curr = np.min(dist, axis=0)
-        if np.all(min_dists_curr > clearance):
-            # print('Lane switch! (to current)')
-            return
+    #     dist = np.linalg.norm(self.trajectory[None, :, :2] - obstacles[:, None], axis=-1)
+    #     min_dists_curr = np.min(dist, axis=0)
+    #     if np.all(min_dists_curr > clearance):
+    #         # print('Lane switch! (to current)')
+    #         return
 
-        for traj in self.trajectories:
-            if np.array_equal(traj, opt_traj) or np.array_equal(traj, self.trajectory):
-                continue
+    #     for traj in self.trajectories:
+    #         if np.array_equal(traj, opt_traj) or np.array_equal(traj, self.trajectory):
+    #             continue
 
-            dist = np.linalg.norm(traj[None, :, :2] - obstacles[:, None], axis=-1)
-            min_dists = np.min(dist, axis=0)
+    #         dist = np.linalg.norm(traj[None, :, :2] - obstacles[:, None], axis=-1)
+    #         min_dists = np.min(dist, axis=0)
 
-            if np.all(min_dists > clearance):
-                print('Lane switch!')
-                self.trajectory = traj
-                return
+    #         if np.all(min_dists > clearance):
+    #             print('Lane switch!')
+    #             self.trajectory = traj
+    #             return
         
-        print('Too fat!')
+    #     print('Too fat!')
 
     def locate_vehicle(self, msg: Odometry):
         """Extract vehicle pose from the Odometry message.
