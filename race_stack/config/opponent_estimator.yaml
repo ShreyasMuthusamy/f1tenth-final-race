@@ -1,0 +1,14 @@
+opponent_estimator_node:
+  ros__parameters:
+    is_sim: true
+    race_mode: false
+    costmap_xmin: -6.0
+    costmap_xmax: 6.0
+    costmap_ymin: -3.0
+    costmap_ymax: 6.0
+    costmap_res: 0.1
+    costmap_tol: 0.1
+    plot_res: 0.1
+    centerline_fname: "centerline_deviate"
+    cluster_dist_tol: 0.6
+    cluster_size_max: 10

@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'final_race'
+package_name = 'ego_controller'
 
 setup(
     name=package_name,
@@ -13,15 +13,14 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='zzangupenn, Hongrui Zheng',
-    maintainer_email='zzang@seas.upenn.edu, billyzheng.bz@gmail.com',
-    description='f1tenth pure_pursuit',
+    maintainer='Shreyas Muthusamy',
+    maintainer_email='shreyas.muthusamy@gmail.com',
+    description='The controller of the robot for the final race.',
     license='MIT',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'controller_node = pure_pursuit.controller_node:main',
-            'waypoint_visualizer = pure_pursuit.waypoint_visualizer:main',
+            'controller_node = ego_controller.controller_node:main',
         ],
     },
 )

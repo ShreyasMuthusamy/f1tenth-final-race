@@ -1,0 +1,5 @@
+controller_node:
+  ros__parameters:
+    is_sim: true
+    trajectories:
+      default: 'centerline_dense'

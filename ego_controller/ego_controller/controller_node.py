@@ -11,32 +11,27 @@ from geometry_msgs.msg import Point
 from std_msgs.msg import MultiArrayDimension, Float32MultiArray
 from builtin_interfaces.msg import Duration
 import pandas as pd
-import yaml
 import os
 
-base_dir = '/home/shreyasm/f1tenth_ws/src/final_race/'
-config_path = os.path.join(base_dir, 'config/race_params.yaml')
-config_path = os.path.abspath(config_path)
-
-def load_parameters(file_path):
-    with open(file_path, "r") as file:
-        params = yaml.safe_load(file)
-    return params
+base_dir = 'src/ego_controller/'
 
 def to_numpy(multiarray):
     dims = tuple(map(lambda x: x.size, multiarray.layout.dim))
     return np.array(multiarray.data, dtype=float).reshape(dims).astype(float)
 
-class PurePursuit(Node):
+class EgoController(Node):
     """ 
     Implement Pure Pursuit on the car
     This is just a template, you are free to implement your own node!
     """
     def __init__(self):
         super().__init__('controller_node')
-        self.config = load_parameters(config_path)
 
-        if self.config['is_sim']:
+        self.declare_parameter('is_sim', True)
+        self.declare_parameter('trajectories.default', '')
+
+        is_sim = self.get_parameter('is_sim').get_parameter_value().bool_value
+        if is_sim:
             odom_topic = '/ego_racecar/odom'
         else:
             odom_topic = '/pf/pose/odom'
@@ -58,8 +53,8 @@ class PurePursuit(Node):
         self.speed_visualizer = self.create_publisher(Marker, '/pp_viz/speed', qos)
 
         # load trajectory
-        wp_name = self.config['controller']['trajectories']['default']
-        wp_path = os.path.join(base_dir, f'waypoints/{wp_name}')
+        wp_name = self.get_parameter('trajectories.default').get_parameter_value().string_value
+        wp_path = os.path.join(base_dir, f'csv/{wp_name}.csv')
         wp_path = os.path.abspath(wp_path)
         self.trajectory = np.array(pd.read_csv(wp_path, sep=';'))
 
@@ -290,11 +285,11 @@ class PurePursuit(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    print("PurePursuit Initialized")
-    pure_pursuit_node = PurePursuit()
-    rclpy.spin(pure_pursuit_node)
+    print("Ego Controller Initialized")
+    ego_controller_node = EgoController()
+    rclpy.spin(ego_controller_node)
 
-    pure_pursuit_node.destroy_node()
+    ego_controller_node.destroy_node()
     rclpy.shutdown()
 
 
